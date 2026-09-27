@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from '../src/App';
@@ -234,6 +234,45 @@ describe('物料清单页', () => {
     expect(screen.getByTestId('bom-table').textContent).toContain('10 尾');
     expect(screen.getByTestId('bom-table').textContent).toContain('过滤器');
     expect(screen.getByTestId('care-card').textContent).toContain('换水');
+  });
+
+  it('清单分组渲染，表头可在每页重复', async () => {
+    const plan = newPlan('分组清单测试');
+    upsertPlan({
+      ...plan,
+      fishes: [{ fishId: 'f-cardinal-tetra', count: 10 }],
+    });
+    window.location.hash = `/plan/${plan.id}/bom`;
+    render(<App />);
+    await screen.findByTestId('bom-page');
+
+    const groups = document.querySelectorAll('.bom-category-group');
+    expect(groups.length).toBeGreaterThan(1);
+    expect(document.querySelector('.bom-table thead tr')).toBeInTheDocument();
+    expect(screen.getByTestId('care-plan-name')).toHaveTextContent('分组清单测试');
+    expect(screen.getByTestId('print-date')).not.toBeEmptyDOMElement();
+  });
+
+  it('两个独立入口分别只打印清单和只打印参数卡', async () => {
+    const plan = newPlan('独立打印测试');
+    upsertPlan(plan);
+    window.location.hash = `/plan/${plan.id}/bom`;
+    render(<App />);
+    await screen.findByTestId('bom-page');
+    const page = screen.getByTestId('bom-page');
+    const printedScopes: string[] = [];
+    const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {
+      printedScopes.push(page.getAttribute('data-print-scope')!);
+    });
+
+    await userEvent.click(screen.getByTestId('print-list'));
+    await userEvent.click(screen.getByTestId('print-care'));
+
+    expect(printSpy).toHaveBeenCalledTimes(2);
+    expect(printedScopes).toEqual(['list', 'care']);
+    expect(page).toHaveAttribute('data-print-scope', 'screen');
+
+    printSpy.mockRestore();
   });
 
   it('导出 SVG 生成 Blob 并触发下载（模拟 URL.createObjectURL）', async () => {
