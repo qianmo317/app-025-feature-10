@@ -360,11 +360,50 @@ label.chk {
   stroke: #d9e6ec;
   stroke-width: 1;
 }
+/* 物料清单 */
+.bom-cat {
+  background: #f0f3f5;
+  font-weight: 600;
+  text-align: center;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.bom-table tbody.bom-group th,
+.bom-table tbody.bom-group td {
+  border: 1px solid var(--line);
+  padding: 6px 8px;
+  text-align: left;
+}
+/* 养护参数卡（屏幕态） */
+.care-card {
+  margin-top: 16px;
+}
+.care-list {
+  line-height: 1.9;
+}
+.care-date {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.print-date {
+  float: right;
+  font-size: 12px;
+  font-weight: 400;
+}
+/* 屏幕 / 打印显隐工具类 */
+.print-only {
+  display: none;
+}
 /* 打印 */
 @media print {
   .no-print,
-  .topbar {
+  .topbar,
+  .screen-only {
     display: none !important;
+  }
+  .print-only {
+    display: block;
   }
   body {
     background: #fff;
@@ -372,8 +411,57 @@ label.chk {
   .bom-page {
     max-width: 100%;
   }
+  .bom-page h2 {
+    font-size: 16px;
+    margin: 0 0 8px;
+  }
+  .bom-table {
+    font-size: 12px;
+  }
+  /* 表头每页重复；单行/单组不被跨页截断 */
+  .bom-table thead {
+    display: table-header-group;
+  }
+  .bom-table tfoot {
+    display: table-footer-group;
+  }
+  .bom-table tr {
+    break-inside: avoid;
+  }
+  /* 类别整组保持在同一页，放不下则整组挪到下一页 */
+  .bom-table tbody.bom-group {
+    break-inside: avoid;
+  }
+  /* 参数卡固定单独占一页 */
   .care-card {
     break-inside: avoid;
+    border: none;
+    padding: 0;
+  }
+  .care-title {
+    font-size: 18px;
+    margin: 0 0 6px;
+  }
+  .care-list {
+    font-size: 14px;
+    line-height: 2.2;
+    margin: 12px 0;
+  }
+  .care-meta {
+    font-size: 12px;
+  }
+  /* 打印模式：只打清单时彻底移除参数卡（隐藏不占位，避免空白尾页） */
+  .print-mode-list .print-section-care {
+    display: none;
+  }
+  /* 打印模式：只打参数卡 */
+  .print-mode-care .print-section-list {
+    display: none;
+  }
+  /* 全部打印：清单结束后强制分页，参数卡独占新页；
+     只打参数卡时参数卡是首个内容，不再前置分页（避免空白首页） */
+  .print-mode-all .print-section-care {
+    break-before: page;
   }
   @page {
     size: A4;

@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from '../src/App';
 import { upsertPlan, newPlan, deletePlan, getPlans } from '../src/state/plans';
@@ -254,6 +254,62 @@ describe('物料清单页', () => {
     expect(created).toContain('image/svg+xml');
     URL.createObjectURL = origCreate;
     URL.revokeObjectURL = origRevoke;
+  });
+
+  it('清单按类别分组（多个 tbody，整组可 break-inside: avoid）', async () => {
+    const plan = newPlan('分组测试');
+    upsertPlan({
+      ...plan,
+      items: [
+        { id: 'i1', kind: 'plant', name: '红宫廷', x: 10, y: 10, scaleCm: 25, rotDeg: 0, layer: 'back', lightNeed: 'high', growth: 'fast', qty: 20 },
+        { id: 'i2', kind: 'plant', name: '小水榕', x: 5, y: 5, scaleCm: 8, rotDeg: 0, layer: 'front', lightNeed: 'low', growth: 'slow', qty: 3 },
+      ],
+      fishes: [{ fishId: 'f-cardinal-tetra', count: 10 }],
+    });
+    window.location.hash = `/plan/${plan.id}/bom`;
+    render(<App />);
+    await screen.findByTestId('bom-page');
+    const groups = screen.getByTestId('bom-table').querySelectorAll('tbody.bom-group');
+    expect(groups.length).toBeGreaterThanOrEqual(4); // 底砂 / 水草 / 生物 / 设备
+    const plantGroup = screen.getByTestId('bom-group-水草');
+    expect(plantGroup.querySelectorAll('tr').length).toBe(2); // 两种草同组
+    // 类别单元格用 rowSpan 合并
+    const cat = plantGroup.querySelector('.bom-cat');
+    expect(cat?.getAttribute('rowspan')).toBe('2');
+  });
+
+  it('三个打印入口：全部 / 只打清单 / 只打参数卡，打印模式类在 afterprint 后清除', async () => {
+    const plan = newPlan('打印模式测试');
+    upsertPlan(plan);
+    window.location.hash = `/plan/${plan.id}/bom`;
+    render(<App />);
+    const page = await screen.findByTestId('bom-page');
+    const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {});
+
+    await userEvent.click(screen.getByTestId('print-list'));
+    await waitFor(() => expect(page).toHaveClass('print-mode-list'));
+    expect(printSpy).toHaveBeenCalledTimes(1);
+    fireEvent(window, new Event('afterprint'));
+    await waitFor(() => expect(page).not.toHaveClass('print-mode-list'));
+
+    await userEvent.click(screen.getByTestId('print-care'));
+    await waitFor(() => expect(page).toHaveClass('print-mode-care'));
+
+    await userEvent.click(screen.getByTestId('print-btn'));
+    await waitFor(() => expect(page).toHaveClass('print-mode-all'));
+    expect(printSpy).toHaveBeenCalledTimes(3);
+    printSpy.mockRestore();
+  });
+
+  it('参数卡带方案名与打印日期（打印标题）', async () => {
+    const plan = newPlan('日期测试');
+    upsertPlan(plan);
+    window.location.hash = `/plan/${plan.id}/bom`;
+    render(<App />);
+    await screen.findByTestId('bom-page');
+    expect(screen.getByTestId('care-card').textContent).toContain('日期测试');
+    const date = screen.getByTestId('care-print-date').textContent ?? '';
+    expect(date).toMatch(/打印日期：\d{4}-\d{2}-\d{2}/);
   });
 });
 
